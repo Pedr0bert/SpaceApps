@@ -17,12 +17,12 @@ class DateTextFormatter extends TextInputFormatter {
         : newText;
 
     var formattedText = '';
-    if (truncatedText.length > 4) {
+    if (truncatedText.length > 6) {
       formattedText =
-          '${truncatedText.substring(0, 2)}/${truncatedText.substring(2, 4)}/${truncatedText.substring(4)}';
-    } else if (truncatedText.length > 2) {
+          '${truncatedText.substring(0, 4)}/${truncatedText.substring(4, 6)}/${truncatedText.substring(6)}';
+    } else if (truncatedText.length > 4) {
       formattedText =
-          '${truncatedText.substring(0, 2)}/${truncatedText.substring(2)}';
+          '${truncatedText.substring(0, 4)}/${truncatedText.substring(4)}';
     } else {
       formattedText = truncatedText;
     }

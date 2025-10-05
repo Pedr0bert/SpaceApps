@@ -1,3 +1,62 @@
+import 'package:flutter/material.dart';
+
+class WeatherIcon extends StatelessWidget {
+  final String iconType;
+  final double size;
+
+  const WeatherIcon({super.key, required this.iconType, this.size = 50});
+
+  @override
+  Widget build(BuildContext context) {
+    IconData iconData;
+    Color iconColor;
+
+    switch (iconType) {
+      case 'sunny':
+        iconData = Icons.wb_sunny;
+        iconColor = Colors.orange;
+        break;
+      case 'partly_cloudy':
+        iconData = Icons.wb_cloudy;
+        iconColor = const Color(0xFF87CEEB);
+        break;
+      case 'cloudy':
+        iconData = Icons.cloud;
+        iconColor = const Color(0xFF708090);
+        break;
+      case 'overcast':
+        iconData = Icons.cloud_circle;
+        iconColor = const Color(0xFF696969);
+        break;
+      case 'light_rain':
+        iconData = Icons.grain;
+        iconColor = const Color(0xFF4A90E2);
+        break;
+      case 'rain':
+        iconData = Icons.cloud_queue;
+        iconColor = const Color(0xFF4A90E2);
+        break;
+      case 'showers':
+        iconData = Icons.shower;
+        iconColor = const Color(0xFF4169E1);
+        break;
+      case 'thunderstorm':
+        iconData = Icons.flash_on;
+        iconColor = const Color(0xFF8B008B);
+        break;
+      case 'clear':
+        iconData = Icons.wb_sunny_outlined;
+        iconColor = Colors.amber;
+        break;
+      default:
+        iconData = Icons.cloud_queue;
+        iconColor = const Color(0xFF4A90E2);
+    }
+
+    return Icon(iconData, size: size, color: iconColor);
+  }
+}
+
 class WeatherData {
   final String temperature;
   final String probability;
@@ -18,95 +77,4 @@ class WeatherData {
     required this.country,
     required this.date,
   });
-
-  static WeatherData getMockData(
-    String city,
-    String state,
-    String country,
-    String date,
-  ) {
-    final Map<String, Map<String, String>> mockWeatherData = {
-      'são paulo': {
-        'temperature': '23°C',
-        'probability': '75%',
-        'description': 'Heavy rain',
-        'iconType': 'rain',
-      },
-      'rio de janeiro': {
-        'temperature': '28°C',
-        'probability': '30%',
-        'description': 'Partly cloudy',
-        'iconType': 'partly_cloudy',
-      },
-      'brasília': {
-        'temperature': '26°C',
-        'probability': '10%',
-        'description': 'Sunny',
-        'iconType': 'sunny',
-      },
-      'salvador': {
-        'temperature': '30°C',
-        'probability': '45%',
-        'description': 'Light rain',
-        'iconType': 'light_rain',
-      },
-      'fortaleza': {
-        'temperature': '32°C',
-        'probability': '20%',
-        'description': 'Clear sky',
-        'iconType': 'clear',
-      },
-      'belo horizonte': {
-        'temperature': '24°C',
-        'probability': '60%',
-        'description': 'Moderate rain',
-        'iconType': 'rain',
-      },
-      'manaus': {
-        'temperature': '31°C',
-        'probability': '80%',
-        'description': 'Thunderstorm',
-        'iconType': 'thunderstorm',
-      },
-      'curitiba': {
-        'temperature': '19°C',
-        'probability': '55%',
-        'description': 'Cloudy',
-        'iconType': 'cloudy',
-      },
-      'porto alegre': {
-        'temperature': '21°C',
-        'probability': '40%',
-        'description': 'Overcast',
-        'iconType': 'overcast',
-      },
-      'recife': {
-        'temperature': '29°C',
-        'probability': '65%',
-        'description': 'Scattered showers',
-        'iconType': 'showers',
-      },
-    };
-
-    final cityKey = city.toLowerCase().trim();
-    final weatherInfo =
-        mockWeatherData[cityKey] ??
-        {
-          'temperature': '25°C',
-          'probability': '60%',
-          'description': 'Moderate rain',
-          'iconType': 'rain',
-        };
-
-    return WeatherData(
-      temperature: weatherInfo['temperature']!,
-      probability: weatherInfo['probability']!,
-      description: weatherInfo['description']!,
-      iconType: weatherInfo['iconType']!,
-      city: city,
-      state: state,
-      country: country,
-      date: date,
-    );
-  }
 }

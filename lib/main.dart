@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:tob/services/date_text_formatter.dart';
+import 'package:tob/weather_service.dart';
+
+import 'services/date_text_formatter.dart';
 import 'models/weather_data.dart';
 import 'services/location_service.dart';
-import 'widgets/weather_icon.dart';
 
 void main() {
   runApp(const WeatherForecastApp());
@@ -33,8 +34,11 @@ class WeatherForecastScreen extends StatefulWidget {
 
 class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
   final TextEditingController _dateController = TextEditingController();
-  WeatherData? _weatherData;
 
+  WeatherData? _weatherData;
+  WeatherProbabilityData? _weatherProbabilityData;
+
+  final WeatherService _weatherService = WeatherService();
   final LocationService _locationService = LocationService();
 
   List<Map<String, String>> _countries = [];
@@ -48,11 +52,20 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
   bool _isLoadingCountries = true;
   bool _isLoadingStates = false;
   bool _isLoadingCities = false;
+  bool _isFetchingWeather = false;
+
+  String _displayDate = '';
 
   @override
   void initState() {
     super.initState();
     _loadCountries();
+  }
+
+  @override
+  void dispose() {
+    _dateController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCountries() async {
@@ -66,7 +79,7 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
       setState(() {
         _isLoadingCountries = false;
       });
-      _showErrorSnackBar('Erro ao carregar países.');
+      _showErrorSnackBar('Error loading countries.');
     }
   }
 
@@ -88,7 +101,7 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
       setState(() {
         _isLoadingStates = false;
       });
-      _showErrorSnackBar('Erro ao carregar estados.');
+      _showErrorSnackBar('Error loading states.');
     }
   }
 
@@ -111,7 +124,7 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
       setState(() {
         _isLoadingCities = false;
       });
-      _showErrorSnackBar('Erro ao carregar cidades.');
+      _showErrorSnackBar('Error loading cities.');
     }
   }
 
@@ -132,13 +145,169 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
         margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         elevation: 4.0,
         action: SnackBarAction(
-          label: 'FECHAR',
+          label: 'CLOSE',
           textColor: Colors.white,
           onPressed: () {
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
           },
         ),
       ),
+    );
+  }
+
+  Future<void> _getWeatherProbability() async {
+    if (_selectedCity == null) {
+      _showErrorSnackBar('Please select a Country, State, and City.');
+      return;
+    }
+
+    String dateStringToProcess;
+    final now = DateTime.now();
+
+    if (_dateController.text.isNotEmpty) {
+      if (!RegExp(r'^\d{4}/\d{2}/\d{2}$').hasMatch(_dateController.text)) {
+        _showErrorSnackBar('Invalid date format. Use YYYY/MM/DD.');
+        return;
+      }
+      try {
+        final parts = _dateController.text.split('/');
+        final year = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final day = int.parse(parts[2]);
+        final date = DateTime(year, month, day);
+        if (date.day != day || date.month != month || date.year != year) {
+          throw const FormatException('Date does not exist on the calendar.');
+        }
+        dateStringToProcess = _dateController.text;
+      } catch (e) {
+        _showErrorSnackBar(
+          'Invalid date. Please check the day, month, and year.',
+        );
+        return;
+      }
+    } else {
+      dateStringToProcess =
+          "${now.year}/${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')}";
+    }
+
+    setState(() {
+      _displayDate = dateStringToProcess;
+      _isFetchingWeather = true;
+    });
+
+    try {
+      final coordinates = await _locationService.getCityCoordinates(
+        _selectedCity!,
+      );
+      if (coordinates == null) {
+        _showErrorSnackBar('Could not find coordinates for $_selectedCity.');
+        setState(() => _isFetchingWeather = false);
+        return;
+      }
+
+      final dateParts = dateStringToProcess.split('/');
+      final formattedDate = '${dateParts[0]}${dateParts[1]}${dateParts[2]}';
+
+      final weatherData = await _weatherService.getWeatherProbability(
+        latitude: coordinates['lat']!,
+        longitude: coordinates['long']!,
+        date: formattedDate,
+      );
+
+      setState(() {
+        _weatherProbabilityData = weatherData;
+      });
+    } catch (e) {
+      _showErrorSnackBar('Error fetching forecast: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isFetchingWeather = false;
+        _showInfoDialog(context);
+      });
+    }
+  }
+
+  void _showInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          backgroundColor: const Color.fromRGBO(255, 255, 255, 0.95),
+          contentPadding: const EdgeInsets.all(24.0),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.insights_rounded,
+                color: Color(0xFF4A90E2),
+                size: 50,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'About the Data',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2C3E50),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text.rich(
+                TextSpan(
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF34495E),
+                    height: 1.5,
+                  ),
+                  children: const [
+                    TextSpan(
+                      text:
+                          'Predictions are generated based on historical data from ',
+                    ),
+                    TextSpan(
+                      text: '2013 to 2024',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    TextSpan(text: ', provided by '),
+                    TextSpan(
+                      text: 'NASA POWER.',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          actions: <Widget>[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A90E2),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  'GOT IT',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -195,7 +364,7 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                 ),
                 const SizedBox(height: 30),
                 _buildDropdown<Map<String, String>>(
-                  hint: "País",
+                  hint: "Country",
                   value: _selectedCountry,
                   items: _countries,
                   onChanged: (value) {
@@ -211,7 +380,7 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                 ),
                 const SizedBox(height: 15),
                 _buildDropdown<Map<String, String>>(
-                  hint: "Estado",
+                  hint: "State",
                   value: _selectedState,
                   items: _states,
                   onChanged: _selectedCountry == null
@@ -232,7 +401,7 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                 ),
                 const SizedBox(height: 15),
                 _buildDropdown<String>(
-                  hint: "Cidade",
+                  hint: "City",
                   value: _selectedCity,
                   items: _cities,
                   onChanged: _selectedState == null
@@ -248,64 +417,10 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                       DropdownMenuItem(value: item, child: Text(item)),
                 ),
                 const SizedBox(height: 15),
-                _buildDateField("Data (Opcional)", _dateController),
+                _buildDateField("Date (Optional)", _dateController),
                 const SizedBox(height: 25),
                 ElevatedButton(
-                  onPressed: () {
-                    if (_selectedCity == null) {
-                      _showErrorSnackBar(
-                        'Por favor, selecione País, Estado e Cidade.',
-                      );
-                      return;
-                    }
-
-                    String dateToUse;
-                    final now = DateTime.now();
-
-                    if (_dateController.text.isNotEmpty) {
-                      if (!RegExp(
-                        r'^\d{2}/\d{2}/\d{4}$',
-                      ).hasMatch(_dateController.text)) {
-                        _showErrorSnackBar(
-                          'Formato de data inválido. Use DD/MM/AAAA.',
-                        );
-                        return;
-                      }
-
-                      try {
-                        final parts = _dateController.text.split('/');
-                        final day = int.parse(parts[0]);
-                        final month = int.parse(parts[1]);
-                        final year = int.parse(parts[2]);
-                        final date = DateTime(year, month, day);
-
-                        if (date.day != day ||
-                            date.month != month ||
-                            date.year != year) {
-                          throw const FormatException(
-                            'Data não existe no calendário.',
-                          );
-                        }
-                        dateToUse = _dateController.text;
-                      } catch (e) {
-                        _showErrorSnackBar(
-                          'Data inválida. Verifique dia, mês e ano.',
-                        );
-                        return;
-                      }
-                    } else {
-                      dateToUse =
-                          "${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}";
-                    }
-                    setState(() {
-                      _weatherData = WeatherData.getMockData(
-                        _selectedCity!,
-                        _selectedState!['name']!,
-                        _selectedCountry!['name']!,
-                        dateToUse,
-                      );
-                    });
-                  },
+                  onPressed: _isFetchingWeather ? null : _getWeatherProbability,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4A90E2),
                     foregroundColor: Colors.white,
@@ -314,20 +429,32 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                       borderRadius: BorderRadius.circular(25),
                     ),
                   ),
-                  child: const Text(
-                    "Check Forecast",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
+                  child: _isFetchingWeather
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : const Text(
+                          "Check Forecast",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 25),
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Color.fromRGBO(255, 255, 255, 0.9),
+                    color: const Color.fromRGBO(255, 255, 255, 0.9),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Color.fromRGBO(0, 0, 0, 0.1),
+                        color: const Color.fromRGBO(0, 0, 0, 0.1),
                         blurRadius: 10,
                         offset: const Offset(0, 5),
                       ),
@@ -336,7 +463,9 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                   child: Column(
                     children: [
                       Text(
-                        _weatherData?.temperature ?? '--°C',
+                        _weatherProbabilityData != null
+                            ? '${_weatherProbabilityData!.temperature.toStringAsFixed(1)}°C'
+                            : '--°C',
                         style: const TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.w600,
@@ -345,21 +474,25 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        _weatherData != null
-                            ? "${_weatherData!.city}, ${_weatherData!.state}"
-                            : 'Insira uma localização',
+                        _selectedCity != null && _selectedState != null
+                            ? "${_selectedCity!}, ${_selectedState!["name"]!}"
+                            : 'Enter a location',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                           color: Color(0xFF7F8C8D),
                         ),
                       ),
-                      if (_weatherData?.date.isNotEmpty ?? false)
-                        Text(
-                          _weatherData!.date,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF95A5A6),
+                      if (_weatherProbabilityData != null &&
+                          _displayDate.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            _displayDate,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF95A5A6),
+                            ),
                           ),
                         ),
                     ],
@@ -381,41 +514,27 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: const Color(0x4D87CEEB),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Center(
-                          child: WeatherIcon(
-                            iconType: _weatherData?.iconType ?? 'sunny',
-                            size: 50,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              "Probability ${_weatherData?.probability ?? '--%'}",
-                              style: const TextStyle(
+                            const Text(
+                              "Historical Summary",
+                              style: TextStyle(
                                 fontSize: 18,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.bold,
                                 color: Color(0xFF2C3E50),
                               ),
                             ),
-                            const SizedBox(height: 5),
+                            const SizedBox(height: 8),
                             Text(
-                              _weatherData?.description ??
-                                  'Aguardando dados...',
+                              _weatherProbabilityData?.message ??
+                                  'Waiting for data...',
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w500,
                                 color: Color(0xFF7F8C8D),
+                                height: 1.5,
                               ),
                             ),
                           ],
@@ -424,10 +543,111 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
                     ],
                   ),
                 ),
+                if (_weatherProbabilityData != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 15.0),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color.fromRGBO(255, 255, 255, 0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Additional Details",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2C3E50),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildInfoRow(
+                            Icons.air,
+                            Colors.blueGrey,
+                            "Wind",
+                            '${_weatherProbabilityData!.wind.toStringAsFixed(1)} m/s',
+                          ),
+                          _buildInfoRow(
+                            Icons.water_drop_outlined,
+                            Colors.lightBlue,
+                            "Precipitation",
+                            '${_weatherProbabilityData!.precip.toStringAsFixed(1)} mm/day',
+                          ),
+                          _buildInfoRow(
+                            Icons.ac_unit,
+                            Colors.cyan,
+                            "Chance of Cold",
+                            '${_weatherProbabilityData!.veryColdProbability.toStringAsFixed(1)}%',
+                          ),
+                          _buildInfoRow(
+                            Icons.local_fire_department_outlined,
+                            Colors.deepOrange,
+                            "Chance of Heat",
+                            '${_weatherProbabilityData!.veryHotProbability.toStringAsFixed(1)}%',
+                          ),
+                          const Divider(height: 20, thickness: 1),
+                          _buildInfoRow(
+                            Icons.check_circle_outline,
+                            Colors.green,
+                            "Data Quality",
+                            _weatherProbabilityData!.qualityMessage,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    IconData icon,
+    Color iconColor,
+    String label,
+    String value,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF2C3E50),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF34495E),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -566,11 +786,11 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
 
   IconData _getIconForHint(String hint) {
     switch (hint.toLowerCase()) {
-      case 'país':
+      case 'country':
         return Icons.public_rounded;
-      case 'estado':
+      case 'state':
         return Icons.location_on_rounded;
-      case 'cidade':
+      case 'city':
         return Icons.location_city_rounded;
       default:
         return Icons.arrow_drop_down_rounded;
@@ -653,11 +873,5 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _dateController.dispose();
-    super.dispose();
   }
 }
