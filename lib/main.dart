@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:tob/weather_service.dart';
 
 import 'services/date_text_formatter.dart';
-import 'models/weather_data.dart';
 import 'services/location_service.dart';
 
 void main() {
@@ -35,7 +34,6 @@ class WeatherForecastScreen extends StatefulWidget {
 class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
   final TextEditingController _dateController = TextEditingController();
 
-  WeatherData? _weatherData;
   WeatherProbabilityData? _weatherProbabilityData;
 
   final WeatherService _weatherService = WeatherService();
