@@ -2,12 +2,11 @@ from flask import Flask, request, jsonify
 import requests
 import pandas as pd
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template_string
 import os
 
 app = Flask(__name__)
 
-# --- Função para pegar dados históricos NASA POWER para um dia específico ---
+# --- Function to get NASA POWER historical data for a specific day ---
 def get_historical_data_day(lat, lon, month_day, years=range(2013, 2024)):
     all_data = []
     for year in years:
@@ -27,20 +26,20 @@ def get_historical_data_day(lat, lon, month_day, years=range(2013, 2024)):
             }, index=pd.to_datetime(list(data["T2M"].keys())))
             all_data.append(df)
         except Exception as e:
-            print(f"Aviso: não foi possível obter dados para {year}: {e}")
+            print(f"Warning: could not retrieve data for {year}: {e}")
     if not all_data:
         return pd.DataFrame()
     return pd.concat(all_data)
 
-# --- Função para calcular probabilidades híbridas e humanizar ---
+# --- Function to calculate hybrid probabilities and humanize output ---
 def calculate_probabilities_humanized(df):
     total_days = len(df)
     if total_days == 0:
         return {
-            "message": "⚠️ Sem dados históricos disponíveis para este dia."
+            "message": "⚠️ No historical data available for this day."
         }
 
-    # Thresholds híbridos
+    # Hybrid thresholds
     temp_mean = df["temperature"].mean()
     temp_std = df["temperature"].std()
     hot_thr = temp_mean + 1.5 * temp_std
@@ -48,27 +47,27 @@ def calculate_probabilities_humanized(df):
     wind_thr = df["wind"].quantile(0.9)
     wet_thr = df["precip"].quantile(0.9)
 
-    # Probabilidades
+    # Probabilities
     prob_hot = (df["temperature"] > hot_thr).sum() / total_days * 100
     prob_cold = (df["temperature"] < cold_thr).sum() / total_days * 100
     prob_windy = (df["wind"] > wind_thr).sum() / total_days * 100
     prob_wet = (df["precip"] > wet_thr).sum() / total_days * 100
 
-    # Médias
+    # Averages
     avg_temp = df["temperature"].mean()
     avg_wind = df["wind"].mean()
     avg_precip = df["precip"].mean()
 
-    # Mensagem humanizada
+    # Humanized message
     message = (
-        f"🌡️ Temperatura média histórica: {avg_temp:.1f}°C\n"
-        f"💨 Velocidade média do vento: {avg_wind:.1f} m/s\n"
-        f"🌧️ Precipitação média: {avg_precip:.1f} mm/dia\n\n"
-        f"Probabilidades para este dia baseado no histórico:\n"
-        f"🔥 Muito quente: {prob_hot:.1f}% (>{hot_thr:.1f}°C)\n"
-        f"❄️ Muito frio: {prob_cold:.1f}% (<{cold_thr:.1f}°C)\n"
-        f"💨 Muito ventoso: {prob_windy:.1f}% (>{wind_thr:.1f} m/s)\n"
-        f"🌧️ Muito úmido: {prob_wet:.1f}% (>{wet_thr:.1f} mm/dia)"
+        f"🌡️ Historical average temperature: {avg_temp:.1f}°C\n"
+        f"💨 Average wind speed: {avg_wind:.1f} m/s\n"
+        f"🌧️ Average precipitation: {avg_precip:.1f} mm/day\n\n"
+        f"Probabilities for this day based on historical data:\n"
+        f"🔥 Very hot: {prob_hot:.1f}% (>{hot_thr:.1f}°C)\n"
+        f"❄️ Very cold: {prob_cold:.1f}% (<{cold_thr:.1f}°C)\n"
+        f"💨 Very windy: {prob_windy:.1f}% (>{wind_thr:.1f} m/s)\n"
+        f"🌧️ Very wet: {prob_wet:.1f}% (>{wet_thr:.1f} mm/day)"
     )
 
     return {
@@ -92,7 +91,7 @@ def calculate_probabilities_humanized(df):
         "message": message
     }
 
-# --- Endpoint principal ---
+# --- Main endpoint ---
 @app.route("/weather_probability", methods=["POST"])
 def weather_probability():
     data = request.get_json()
@@ -100,18 +99,18 @@ def weather_probability():
     lon = data["longitude"]
     date_str = data["date"]  # YYYYMMDD
 
-    # Qualidade dos dados
+    # Data quality
     target_year = int(date_str[:4])
     today_year = datetime.now().year
     delta_years = abs(target_year - today_year)
     if delta_years == 0:
-        quality_msg = "Alta confiabilidade (dados recentes)."
+        quality_msg = "High reliability (recent date)."
     elif delta_years <= 2:
-        quality_msg = "Boa confiabilidade (pequena distância temporal)."
+        quality_msg = "Good reliability (small temporal distance)."
     else:
-        quality_msg = "⚠️ Confiabilidade reduzida para datas muito distantes do presente."
+        quality_msg = "⚠️ Reduced reliability for dates far from the present."
 
-    # Histórico para o mesmo dia
+    # Historical data for the same day
     month_day = date_str[4:]
     df_hist = get_historical_data_day(lat, lon, month_day)
     stats = calculate_probabilities_humanized(df_hist)
@@ -119,9 +118,6 @@ def weather_probability():
 
     return jsonify(stats)
 
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # 5000 para teste local
+    port = int(os.environ.get("PORT", 5000))  # 5000 for local testing
     app.run(host="0.0.0.0", port=port, debug=True)
-
-
