@@ -118,11 +118,7 @@ def weather_probability():
 
     return jsonify(stats)
 
-# Servir o HTML como página principal
-@app.route("/")
-def index():
-    html_content = open("web.html").read()
-    return render_template_string(html_content)
 
 if __name__ == "__main__":
     app.run(debug=True)
+
