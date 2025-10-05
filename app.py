@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template_string
+import os
 
 app = Flask(__name__)
 
@@ -120,5 +121,7 @@ def weather_probability():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # 5000 para teste local
+    app.run(host="0.0.0.0", port=port, debug=True)
+
 
