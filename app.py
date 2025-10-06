@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # Import CORS to handle cross-origin requests from the Flutter app
-import requests  # To make HTTP requests to the NASA API
-import pandas as pd  # To process and analyze the data efficiently
-from datetime import datetime  # To work with dates
-import os  # To access environment variables (for the port)
+from flask_cors import CORS 
+import requests 
+import pandas as pd 
+from datetime import datetime  
+import os  
 
 # --- Initialize the Flask Application ---
 app = Flask(__name__)
@@ -156,4 +156,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     # Run the Flask app. In production (like on Render), a Gunicorn server will be used instead.
     app.run(host="0.0.0.0", port=port)
+
 
