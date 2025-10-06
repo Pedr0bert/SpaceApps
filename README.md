@@ -6,7 +6,7 @@ TOBI (Temperature, Observation & Behavior Index) is a project developed by **Tea
 
 website: https://smlesilva.github.io/TOBI/
 
-APK(Download): 
+apk(download): https://github.com/Pedr0bert/TOBI/releases/download/app/TOBI.1.apk
 ---
 
 ## What does it do and how does it work?
